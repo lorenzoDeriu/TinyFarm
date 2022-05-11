@@ -1,10 +1,16 @@
 #include "xerrori.h"
 
+#include <arpa/inet.h>
+#include <sys/socket.h>
+
 #define INFO __LINE__,__FILE__
 #define DEFAULT_STRING_SIZE 255
 #define SHARED 1
 
 #define END_OF_TASK "__END___OF____TASK__" // TODO trovare soluzione migliore
+
+#define PORT 65001
+#define HOST "127.0.0.1"
 
 typedef struct {
 	char **buffer;
@@ -15,9 +21,15 @@ typedef struct {
 	int *index;
 } Thread_worker_args;
 
+typedef struct {
+	char *file_name;
+	long result;
+} Result;
+
 char **remove_option(int*, char**);
 bool is_option(char *);
 void *thread_worker_body(void*);
+int socket_create();
 
 int main(int argc, char **argv) {
 	int num_thread = 4;
@@ -71,8 +83,6 @@ int main(int argc, char **argv) {
 		xpthread_create(&thread_worker[i], NULL, thread_worker_body, arg+i, INFO);
 	}
 
-	sleep(delay);
-
 	for (int i = optind; i < argc; i++) {
 		xsem_wait(&sem_free_slot, INFO);
 		
@@ -80,10 +90,8 @@ int main(int argc, char **argv) {
 		master_index++;
 		
 		xsem_post(&sem_data_items, INFO);
+		usleep(delay);
 	}
-	
-	fprintf(stderr, "QUI\n");
-
 
 	for (int i = 0; i < num_thread; i++) {
 		xsem_wait(&sem_free_slot, INFO);
@@ -94,8 +102,9 @@ int main(int argc, char **argv) {
 		xsem_post(&sem_data_items, INFO);
 	}
 
-
 	for (int i = 0; i < num_thread; i++) pthread_join(thread_worker[i], NULL);
+
+	// TODO: Chiudere il server
 
 	// debug
 	// printf("num_thread = %d\tbuffer_size = %d\tdelay = %d\n", num_thread, buffer_size, delay);
@@ -122,12 +131,14 @@ void *thread_worker_body(void *arguments) {
 
 	char *file_name = NULL;
 
-	while (/*Da decidere*/ true) {
+	bool finished = false;
+
+	while (!finished) {
 		xsem_wait(args->sem_data_items, INFO);
 		xpthread_mutex_lock(args->buffer_mutex, INFO);
 		
 		file_name = strdup(args->buffer[*(args->index) % args->buffer_size]);
-		free(args->buffer[*(args->index)]);
+		free(args->buffer[*(args->index) % args->buffer_size]);
 		*args->index += 1;
 
 		xpthread_mutex_unlock(args->buffer_mutex, INFO);
@@ -136,7 +147,8 @@ void *thread_worker_body(void *arguments) {
 		if (file_name == NULL) xtermina("invalid read from buffer", INFO);
 		if (strcmp(file_name, END_OF_TASK) == 0) {
 			free(file_name);
-			break;
+			finished = true;
+			continue;
 		}
 
 		FILE *file_desriptor = fopen(file_name, "r");
@@ -149,8 +161,47 @@ void *thread_worker_body(void *arguments) {
 		while (fread(&number, sizeof(long), 1, file_desriptor) != 0) {
 			result += i * number;
 			i++;
+		}
 
-			// usleep(30000);
+		fclose(file_desriptor);
+
+		int socket_file_descriptor = socket_create();
+		struct sockaddr_in server_address;
+
+		server_address.sin_family = AF_INET;
+
+		server_address.sin_port = htons(PORT);
+		server_address.sin_addr.s_addr = inet_addr(HOST);
+
+		if (connect(socket_file_descriptor, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
+			xtermina("Socket connection error", INFO);
+		}
+
+		char result_str[255];
+		int result_length;
+
+		if ((result_length = sprintf(result_str, "%ld", result)) < 0) xtermina("sprintf error", INFO);
+
+		result_length = htonl(result_length);
+		int writen_return_value = writen(socket_file_descriptor, &result_length, sizeof(result_length));
+		if (writen_return_value != sizeof(result_length)) {
+			xtermina("write error", INFO);
+		}
+
+		writen_return_value = writen(socket_file_descriptor, result_str, strlen(result_str));
+		if (writen_return_value != strlen(result_str)) {
+			xtermina("write error", INFO);
+		}
+
+		int file_name_length = htonl(strlen(file_name));
+		writen_return_value = writen(socket_file_descriptor, &file_name_length, sizeof(file_name_length));
+		if (writen_return_value != sizeof(file_name_length)) {
+			xtermina("write error", INFO);
+		}
+
+		writen_return_value = writen(socket_file_descriptor, file_name, strlen(file_name));
+		if (writen_return_value != (strlen(file_name))) {
+			xtermina("write error", INFO);
 		}
 
 		free(file_name);
@@ -159,5 +210,12 @@ void *thread_worker_body(void *arguments) {
 	pthread_exit(NULL);
 }
 
-// 9876543210
-// 9876538425
+int socket_create() {
+	int file_descriptor = 0;
+
+	if ((file_descriptor = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		xtermina("socket creation erro", INFO);
+	}
+
+	return file_descriptor;
+}

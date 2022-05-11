@@ -4,16 +4,18 @@ LDLIBS=-lm -lrt -pthread
 
 # singolo eseguilbile da compilare
 MAIN=farm
+TEST=test
 # EXECS=
 
 # se si scrive solo make di default compila main
 all: $(MAIN)
 
 farm: farm.o xerrori.o
+test: test.o xerrori.o
 
 # target che cancella eseguibili e file oggetto
 clean: 
-	rm -f $(MAIN) $(EXECS) *.o
+	rm -f $(MAIN) $(TEST) *.o
 
 # target che crea l'archivio dei sorgenti
 # zip:
