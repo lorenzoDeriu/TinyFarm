@@ -59,16 +59,16 @@ def main(host=DEFAULT_HOST, port=DEFAULT_PORT):
 
 def connection_handling(connection, address, instruction):
 	with connection:
-		data = connection.recv(4)
+		data = recv_all(connection,4)
 		length_result = struct.unpack("!i", data[:4])[0]
 
-		data = connection.recv(length_result)
+		data = recv_all(connection, length_result)
 		result = data[:length_result]
 
-		data = connection.recv(4)
+		data = recv_all(connection, 4)
 		length_file_name = struct.unpack("!i", data[:4])[0]
 
-		data = connection.recv(length_file_name)
+		data = recv_all(connection, length_file_name)
 		file_name = data[:length_file_name]
 
 
@@ -80,16 +80,16 @@ def connection_handling(connection, address, instruction):
 
 
 
-# def recv_all(conn,n):
-# 	chunks = b''
-# 	bytes_recd = 0
-# 	while bytes_recd < n:
-# 		chunk = conn.recv(min(n - bytes_recd, 1024))
-# 		if len(chunk) == 0:
-# 			raise RuntimeError("socket connection broken")
-# 		chunks += chunk
-# 		bytes_recd = bytes_recd + len(chunk)
-# 	return chunks
+def recv_all(conn,n):
+	chunks = b''
+	bytes_recd = 0
+	while bytes_recd < n:
+		chunk = conn.recv(min(n - bytes_recd, 1024))
+		if len(chunk) == 0:
+			raise RuntimeError("socket connection broken")
+		chunks += chunk
+		bytes_recd = bytes_recd + len(chunk)
+	return chunks
 
 
 
