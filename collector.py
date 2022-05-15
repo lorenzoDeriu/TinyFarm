@@ -2,25 +2,14 @@ import sys
 import struct
 import socket
 import threading
+import select
+import time
+
+
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 65001
-LONG_SIZE = 8
-STRING_SIZE = 255
+DEFAULT_PORT = 65000
 END_OF_TASK = "__END___OF____TASK__"
-
-
-class ClientThread(threading.Thread):
-	def __init__(self, connection, address, instruction):
-		threading.Thread.__init__(self)
-		self.conn = connection
-		self.addr = address
-		self.instruction = instruction
-	
-	def run(self):
-		# print("====", self.ident, "mi occupo di", self.addr)
-		connection_handling(self.conn, self.addr, self.instruction)
-		# print("====", self.ident, "ho finito")
 
 
 
@@ -30,7 +19,7 @@ class Instruction:
 
 	def shutdown(self):
 		self.finished = True
-		print("segnale di terminazione mandato")
+
 
 
 def main(host=DEFAULT_HOST, port=DEFAULT_PORT):
@@ -41,25 +30,30 @@ def main(host=DEFAULT_HOST, port=DEFAULT_PORT):
 			server.bind((host, port))
 			server.listen()
 
-			while not instruction.finished:
-				# print("Processo Collector in attesa di richieste...", instruction.finished)
+			input_socket = [server]
 
-				if instruction.finished: break
+			while len(input_socket) > 0 and not (len(input_socket) == 1 and instruction.finished):
+				ready,_,_ = select.select(input_socket, [], [], 10)
 
-				connection, address = server.accept()
-				
-				thread = ClientThread(connection, address, instruction)
-				thread.start()
+				if len(ready) == 0: continue
+				else:
+					for c in ready:
+						if c is server and not instruction.finished:
+							connection, address = server.accept()
+							input_socket.append(connection)
+						else:
+							input_socket.remove(c)
+							connection_handling(c, instruction)
 		except KeyboardInterrupt: pass
-	
-		print("Server Chiuso")
+		
 		server.shutdown(socket.SHUT_RDWR)
+	print("Server Chiuso")
 
 
 
-def connection_handling(connection, address, instruction):
+def connection_handling(connection, instruction):
 	with connection:
-		data = recv_all(connection,4)
+		data = recv_all(connection, 4)
 		length_result = struct.unpack("!i", data[:4])[0]
 
 		data = recv_all(connection, length_result)
@@ -71,12 +65,11 @@ def connection_handling(connection, address, instruction):
 		data = recv_all(connection, length_file_name)
 		file_name = data[:length_file_name]
 
-
 		if file_name.decode() == END_OF_TASK: 
 			instruction.shutdown() # TODO trovare soluzione migliore
 			return
 
-		print(f"{result.decode()} {file_name.decode()}")
+		print("%12s \t %s" % (result.decode(), file_name.decode()))
 
 
 

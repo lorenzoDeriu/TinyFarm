@@ -9,7 +9,7 @@
 
 #define END_OF_TASK "__END___OF____TASK__" // TODO trovare soluzione migliore
 
-#define PORT 65001
+#define PORT 65000
 #define HOST "127.0.0.1"
 
 typedef struct {
@@ -30,6 +30,8 @@ char **remove_option(int*, char**);
 bool is_option(char *);
 void *thread_worker_body(void*);
 int socket_create();
+void send_to(int, void*, size_t);
+void close_server();
 
 int main(int argc, char **argv) {
 	int num_thread = 4;
@@ -104,13 +106,9 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < num_thread; i++) pthread_join(thread_worker[i], NULL);
 
-	// TODO: Chiudere il server
+	close_server();
 
-	// debug
-	// printf("num_thread = %d\tbuffer_size = %d\tdelay = %d\n", num_thread, buffer_size, delay);
-	// for (int i = 0; i < argc; i++) printf("%s\n", argv[i]);
-	// end debug
-	
+	// TODO: Chiudere il server
 
 	// TODO:
 	//	-	buffer free
@@ -169,7 +167,6 @@ void *thread_worker_body(void *arguments) {
 		struct sockaddr_in server_address;
 
 		server_address.sin_family = AF_INET;
-
 		server_address.sin_port = htons(PORT);
 		server_address.sin_addr.s_addr = inet_addr(HOST);
 
@@ -183,28 +180,15 @@ void *thread_worker_body(void *arguments) {
 		if ((result_length = sprintf(result_str, "%ld", result)) < 0) xtermina("sprintf error", INFO);
 
 		result_length = htonl(result_length);
-		int writen_return_value = writen(socket_file_descriptor, &result_length, sizeof(result_length));
-		if (writen_return_value != sizeof(result_length)) {
-			xtermina("write error", INFO);
-		}
-
-		writen_return_value = writen(socket_file_descriptor, result_str, strlen(result_str));
-		if (writen_return_value != strlen(result_str)) {
-			xtermina("write error", INFO);
-		}
-
+		send_to(socket_file_descriptor, (void *)&result_length, sizeof(result_length));
+		send_to(socket_file_descriptor, (void *)result_str, strlen(result_str));
+		
 		int file_name_length = htonl(strlen(file_name));
-		writen_return_value = writen(socket_file_descriptor, &file_name_length, sizeof(file_name_length));
-		if (writen_return_value != sizeof(file_name_length)) {
-			xtermina("write error", INFO);
-		}
-
-		writen_return_value = writen(socket_file_descriptor, file_name, strlen(file_name));
-		if (writen_return_value != (strlen(file_name))) {
-			xtermina("write error", INFO);
-		}
-
+		send_to(socket_file_descriptor, (void *)&file_name_length, sizeof(file_name_length));
+		send_to(socket_file_descriptor, (void *)file_name, strlen(file_name));
+	
 		free(file_name);
+		if (close(socket_file_descriptor)) xtermina("close error", INFO);
 	}
 
 	pthread_exit(NULL);
@@ -218,4 +202,39 @@ int socket_create() {
 	}
 
 	return file_descriptor;
+}
+
+void send_to(int socket_file_descriptor, void *data, size_t data_size) {
+	int writen_return_value = writen(socket_file_descriptor, data, data_size);
+	if (writen_return_value != data_size) {
+		xtermina("write error", INFO);
+	}
+}
+
+void close_server() {
+	int socket_file_descriptor = socket_create();
+	struct sockaddr_in server_address;
+
+	server_address.sin_family = AF_INET;
+	server_address.sin_port = htons(PORT);
+	server_address.sin_addr.s_addr = inet_addr(HOST);
+
+	if (connect(socket_file_descriptor, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
+		xtermina("Socket connection error", INFO);
+	}
+
+	char *result_str = "0";
+	int result_length;
+
+	// char *end_of_task_signal = strdup(END_OF_TASK);
+
+	result_length = htonl(strlen(result_str));
+	send_to(socket_file_descriptor, (void *)&result_length, sizeof(result_length));
+	send_to(socket_file_descriptor, (void *)result_str, strlen(result_str));
+	
+	int length = htonl(strlen(END_OF_TASK));
+	send_to(socket_file_descriptor, (void *)&length, sizeof(length));
+	send_to(socket_file_descriptor, (void *)END_OF_TASK, strlen(END_OF_TASK));
+
+	if (close(socket_file_descriptor)) xtermina("close error", INFO);
 }
