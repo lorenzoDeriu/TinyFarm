@@ -2,21 +2,19 @@ CC=gcc
 CFLAGS=-g -Wall -O -std=c99
 LDLIBS=-lm -lrt -pthread
 
-# singolo eseguilbile da compilare
 MAIN=farm
 TEST=test
-# EXECS=
 
-# se si scrive solo make di default compila main
-all: $(MAIN)
+all: $(MAIN) start-server start-program
 
 farm: farm.o xerrori.o
+
+start-server: 
+	python3 collector.py &
+start-program: 
+	./farm z0.dat z1.dat
+
 test: test.o xerrori.o
 
-# target che cancella eseguibili e file oggetto
 clean: 
 	rm -f $(MAIN) $(TEST) *.o
-
-# target che crea l'archivio dei sorgenti
-# zip:
-#         zip $(MAIN).zip makefile *.c *.h *.py *.md

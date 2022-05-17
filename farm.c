@@ -10,7 +10,9 @@
 #define END_OF_TASK "__END___OF____TASK__" // TODO trovare soluzione migliore
 
 #define PORT 65000
-#define HOST "127.0.0.1"
+#define HOST "127.0.0.250"
+
+volatile bool _interrupt = false;
 
 typedef struct {
 	char **buffer;
@@ -21,11 +23,6 @@ typedef struct {
 	int *index;
 } Thread_worker_args;
 
-typedef struct {
-	char *file_name;
-	long result;
-} Result;
-
 char **remove_option(int*, char**);
 bool is_option(char *);
 void *thread_worker_body(void*);
@@ -33,31 +30,40 @@ int socket_create();
 void send_to(int, void*, size_t);
 void close_server();
 
+void handler(int);
+
 int main(int argc, char **argv) {
 	int num_thread = 4;
 	int buffer_size = 8;
 	int delay = 0;
 	char opt;
 
+	struct sigaction sa;
+	sigaction(SIGINT, NULL, &sa);
+	sa.sa_handler = handler;
+	sigaction(SIGINT, &sa, NULL); 
+
 	while ((opt = getopt(argc, argv, "n:t:q:")) != -1) {
 		switch (opt) {
 			case 'n':
 				num_thread = atoi(optarg);
+				if (num_thread < 1) termina("The number of thread must be higher than 1");
 				break;
 			case 'q':
 				buffer_size = atoi(optarg);
+				if (buffer_size < 1) termina("The size of the buffer must be higher than 1");
 				break;
 			case 't':
 				delay = atoi(optarg);
 				break;
 			default:
 				fprintf(stderr, "Usage: %s file [file ...] [-t nsecs] [-n num_thread] [-q buffer_size] \n", argv[0]);
-				exit(EXIT_FAILURE);
+				return 1;
 		}
 	}
 
 	if (argc - optind < 2) {
-		printf("Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t delay] \n", argv[0]);
+		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t delay] \n", argv[0]);
 		return 1;
 	}
 
@@ -85,10 +91,10 @@ int main(int argc, char **argv) {
 		xpthread_create(&thread_worker[i], NULL, thread_worker_body, arg+i, INFO);
 	}
 
-	for (int i = optind; i < argc; i++) {
+	for (int i = optind; i < argc && !_interrupt; i++) {
 		xsem_wait(&sem_free_slot, INFO);
 		
-		buffer[master_index % buffer_size] = strdup(argv[i]);
+		buffer[master_index % buffer_size] = argv[i];
 		master_index++;
 		
 		xsem_post(&sem_data_items, INFO);
@@ -98,7 +104,7 @@ int main(int argc, char **argv) {
 	for (int i = 0; i < num_thread; i++) {
 		xsem_wait(&sem_free_slot, INFO);
 		
-		buffer[master_index % buffer_size] = strdup(END_OF_TASK);
+		buffer[master_index % buffer_size] = END_OF_TASK;
 		master_index++;
 		
 		xsem_post(&sem_data_items, INFO);
@@ -106,37 +112,23 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < num_thread; i++) pthread_join(thread_worker[i], NULL);
 
+	free(buffer);
+
 	close_server();
-
-	// TODO: Chiudere il server
-
-	// TODO:
-	//	-	buffer free
-	// 	-	argv file_name
 
 	return 0;
 }
 
-
-bool is_option(char *str) {
-	return str[0] == '-';
-}
-
-
 void *thread_worker_body(void *arguments) {
-	fprintf(stderr, "Thread partito\n");
 	Thread_worker_args *args = (Thread_worker_args *)arguments;
 
 	char *file_name = NULL;
 
-	bool finished = false;
-
-	while (!finished) {
+	while (true) {
 		xsem_wait(args->sem_data_items, INFO);
 		xpthread_mutex_lock(args->buffer_mutex, INFO);
 		
 		file_name = strdup(args->buffer[*(args->index) % args->buffer_size]);
-		free(args->buffer[*(args->index) % args->buffer_size]);
 		*args->index += 1;
 
 		xpthread_mutex_unlock(args->buffer_mutex, INFO);
@@ -145,12 +137,15 @@ void *thread_worker_body(void *arguments) {
 		if (file_name == NULL) xtermina("invalid read from buffer", INFO);
 		if (strcmp(file_name, END_OF_TASK) == 0) {
 			free(file_name);
-			finished = true;
-			continue;
+			break;
 		}
 
 		FILE *file_desriptor = fopen(file_name, "r");
-		if (file_desriptor == NULL) xtermina("fopen error", INFO);
+		if (file_desriptor == NULL) {
+			fprintf(stderr, "Errore: il file %s non esiste\n", file_name);
+			free(file_name);
+			continue;
+		}
 
 		long number = 0;
 		long result = 0;
@@ -162,7 +157,7 @@ void *thread_worker_body(void *arguments) {
 		}
 
 		fclose(file_desriptor);
-
+ 
 		int socket_file_descriptor = socket_create();
 		struct sockaddr_in server_address;
 
@@ -170,8 +165,11 @@ void *thread_worker_body(void *arguments) {
 		server_address.sin_port = htons(PORT);
 		server_address.sin_addr.s_addr = inet_addr(HOST);
 
-		if (connect(socket_file_descriptor, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-			xtermina("Socket connection error", INFO);
+		if (connect(socket_file_descriptor, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
+			close(socket_file_descriptor);
+			free(file_name);
+			fprintf(stderr, "socket connection failed\n");
+			continue;
 		}
 
 		char result_str[255];
@@ -188,7 +186,9 @@ void *thread_worker_body(void *arguments) {
 		send_to(socket_file_descriptor, (void *)file_name, strlen(file_name));
 	
 		free(file_name);
-		if (close(socket_file_descriptor)) xtermina("close error", INFO);
+		
+		int err = close(socket_file_descriptor);
+		if (err < 0) xtermina("close error", INFO);
 	}
 
 	pthread_exit(NULL);
@@ -198,7 +198,7 @@ int socket_create() {
 	int file_descriptor = 0;
 
 	if ((file_descriptor = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		xtermina("socket creation erro", INFO);
+		xtermina("socket creation error", INFO);
 	}
 
 	return file_descriptor;
@@ -220,13 +220,15 @@ void close_server() {
 	server_address.sin_addr.s_addr = inet_addr(HOST);
 
 	if (connect(socket_file_descriptor, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-		xtermina("Socket connection error", INFO);
+		int err = close(socket_file_descriptor);
+		if (err < 0) xtermina("close error", INFO);
+
+		fprintf(stderr, "Socket connection failed\n");
+		return;
 	}
 
 	char *result_str = "0";
 	int result_length;
-
-	// char *end_of_task_signal = strdup(END_OF_TASK);
 
 	result_length = htonl(strlen(result_str));
 	send_to(socket_file_descriptor, (void *)&result_length, sizeof(result_length));
@@ -236,5 +238,10 @@ void close_server() {
 	send_to(socket_file_descriptor, (void *)&length, sizeof(length));
 	send_to(socket_file_descriptor, (void *)END_OF_TASK, strlen(END_OF_TASK));
 
-	if (close(socket_file_descriptor)) xtermina("close error", INFO);
+	int err = close(socket_file_descriptor);
+	if (err) xtermina("close error", INFO);
+}
+
+void handler(int signal) {
+	if (signal == SIGINT) _interrupt = true;
 }

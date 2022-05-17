@@ -7,7 +7,7 @@ import time
 
 
 
-DEFAULT_HOST = "127.0.0.1"
+DEFAULT_HOST = "127.0.0.250"
 DEFAULT_PORT = 65000
 END_OF_TASK = "__END___OF____TASK__"
 
