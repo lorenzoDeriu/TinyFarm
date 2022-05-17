@@ -62,7 +62,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (argc - optind < 2) {
+	if (argc - optind < 1) {
 		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t delay] \n", argv[0]);
 		return 1;
 	}
