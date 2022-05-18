@@ -10,7 +10,7 @@
 #define END_OF_TASK "__END___OF____TASK__" // TODO trovare soluzione migliore
 
 #define PORT 65000
-#define HOST "127.0.0.250"
+#define HOST "127.0.0.1"
 
 volatile bool _interrupt = false;
 
@@ -56,14 +56,11 @@ int main(int argc, char **argv) {
 			case 't':
 				delay = atoi(optarg);
 				break;
-			default:
-				fprintf(stderr, "Usage: %s file [file ...] [-t nsecs] [-n num_thread] [-q buffer_size] \n", argv[0]);
-				return 1;
 		}
 	}
 
 	if (argc - optind < 1) {
-		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t delay] \n", argv[0]);
+		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t milliseconds_delay] \n", argv[0]);
 		return 1;
 	}
 
@@ -110,7 +107,7 @@ int main(int argc, char **argv) {
 		xsem_post(&sem_data_items, INFO);
 	}
 
-	for (int i = 0; i < num_thread; i++) pthread_join(thread_worker[i], NULL);
+	for (int i = 0; i < num_thread; i++) xpthread_join(thread_worker[i], NULL, INFO);
 
 	free(buffer);
 
@@ -190,7 +187,7 @@ void *thread_worker_body(void *arguments) {
 		int err = close(socket_file_descriptor);
 		if (err < 0) xtermina("close error", INFO);
 	}
-
+	
 	pthread_exit(NULL);
 }
 
