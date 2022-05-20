@@ -9,8 +9,8 @@
 
 #define END_OF_TASK "__END___OF____TASK__" // TODO trovare soluzione migliore
 
-#define PORT 65000
-#define HOST "127.0.0.1"
+#define PORT 65123
+#define HOST "127.0.0.197"
 
 volatile bool _interrupt = false;
 
@@ -169,7 +169,7 @@ void *thread_worker_body(void *arguments) {
 			continue;
 		}
 
-		char result_str[255];
+		char *result_str = malloc(255 * sizeof(char));
 		int result_length;
 
 		if ((result_length = sprintf(result_str, "%ld", result)) < 0) xtermina("sprintf error", INFO);
@@ -178,6 +178,8 @@ void *thread_worker_body(void *arguments) {
 		send_to(socket_file_descriptor, (void *)&result_length, sizeof(result_length));
 		send_to(socket_file_descriptor, (void *)result_str, strlen(result_str));
 		
+		free(result_str);
+
 		int file_name_length = htonl(strlen(file_name));
 		send_to(socket_file_descriptor, (void *)&file_name_length, sizeof(file_name_length));
 		send_to(socket_file_descriptor, (void *)file_name, strlen(file_name));
@@ -187,7 +189,7 @@ void *thread_worker_body(void *arguments) {
 		int err = close(socket_file_descriptor);
 		if (err < 0) xtermina("close error", INFO);
 	}
-	
+
 	pthread_exit(NULL);
 }
 
