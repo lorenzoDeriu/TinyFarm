@@ -44,10 +44,14 @@ def main(host=DEFAULT_HOST, port=DEFAULT_PORT):
 						else:
 							input_socket.remove(c)
 							connection_handling(c, instruction)
+		except OSError: 
+			print("Il server non è stato avviato. Riprovare avvio con porta e indirizzo differenti")
+			print("-> python3 collector.py address port")
+			return
 		except KeyboardInterrupt: pass
 		
 		server.shutdown(socket.SHUT_RDWR)
-	print("Server Chiuso")
+	print("Server chiuso corretamente")
 
 
 
@@ -91,7 +95,7 @@ if len(sys.argv) == 1:
 elif len(sys.argv) == 2:
 	main(sys.argv[1])
 elif len(sys.argv) == 3:
-	main(sys.argv[1], sys.argv[2])
+	main(sys.argv[1], int(sys.argv[2]))
 else:
 	print(f"usage {sys.argv[0]} [host] [port]")
 

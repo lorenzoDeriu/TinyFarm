@@ -4,13 +4,12 @@
 #include <sys/socket.h>
 
 #define INFO __LINE__,__FILE__
-#define DEFAULT_STRING_SIZE 255
 #define SHARED 1
 
-#define END_OF_TASK "__END___OF____TASK__" // TODO trovare soluzione migliore
+#define END_OF_TASK "__END___OF____TASK__"
 
-#define PORT 65123
-#define HOST "127.0.0.197"
+#define DEFAULT_PORT 65123
+#define DEFAULT_HOST "127.0.0.197"
 
 volatile bool _interrupt = false;
 
@@ -21,6 +20,8 @@ typedef struct {
 	sem_t *sem_free_slot;
 	sem_t *sem_data_items;
 	int *index;
+	int port;
+	char *host_address;
 } Thread_worker_args;
 
 char **remove_option(int*, char**);
@@ -36,14 +37,15 @@ int main(int argc, char **argv) {
 	int num_thread = 4;
 	int buffer_size = 8;
 	int delay = 0;
+	char *host_address = DEFAULT_HOST;
+	int port = DEFAULT_PORT;
 	char opt;
 
 	struct sigaction sa;
-	sigaction(SIGINT, NULL, &sa);
 	sa.sa_handler = handler;
 	sigaction(SIGINT, &sa, NULL); 
 
-	while ((opt = getopt(argc, argv, "n:t:q:")) != -1) {
+	while ((opt = getopt(argc, argv, "n:t:q:p:h:")) != -1) {
 		switch (opt) {
 			case 'n':
 				num_thread = atoi(optarg);
@@ -56,11 +58,19 @@ int main(int argc, char **argv) {
 			case 't':
 				delay = atoi(optarg);
 				break;
+			case 'p':
+				port = atoi(optarg);
+				break;
+			case 'h':
+				host_address = optarg;
+				break;
 		}
 	}
 
+	// fprintf(stderr, "host %s\nport %d", host_address, port);
+
 	if (argc - optind < 1) {
-		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t milliseconds_delay] \n", argv[0]);
+		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t milliseconds_delay] [-h new_host_address] [-p new_port]\n", argv[0]);
 		return 1;
 	}
 
@@ -77,6 +87,7 @@ int main(int argc, char **argv) {
 	Thread_worker_args arg[num_thread];
 	pthread_t thread_worker[num_thread];
 
+	
 	for (int i = 0;  i < num_thread; i++) {
 		arg[i].buffer = buffer;
 		arg[i].buffer_size = buffer_size;
@@ -84,6 +95,8 @@ int main(int argc, char **argv) {
 		arg[i].sem_data_items = &sem_data_items;
 		arg[i].sem_free_slot = &sem_free_slot;
 		arg[i].index = &worker_index;
+		arg[i].port = port;
+		arg[i].host_address = host_address;
 
 		xpthread_create(&thread_worker[i], NULL, thread_worker_body, arg+i, INFO);
 	}
@@ -108,10 +121,11 @@ int main(int argc, char **argv) {
 	}
 
 	for (int i = 0; i < num_thread; i++) xpthread_join(thread_worker[i], NULL, INFO);
+	
 
 	free(buffer);
 
-	close_server();
+	close_server(port, host_address);
 
 	return 0;
 }
@@ -159,13 +173,13 @@ void *thread_worker_body(void *arguments) {
 		struct sockaddr_in server_address;
 
 		server_address.sin_family = AF_INET;
-		server_address.sin_port = htons(PORT);
-		server_address.sin_addr.s_addr = inet_addr(HOST);
+		server_address.sin_port = htons(args->port);
+		server_address.sin_addr.s_addr = inet_addr(args->host_address);
 
 		if (connect(socket_file_descriptor, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
 			close(socket_file_descriptor);
 			free(file_name);
-			fprintf(stderr, "socket connection failed\n");
+			fprintf(stderr, "Socket connection failed\n");
 			continue;
 		}
 
@@ -210,13 +224,13 @@ void send_to(int socket_file_descriptor, void *data, size_t data_size) {
 	}
 }
 
-void close_server() {
+void close_server(int port, char *host_address) {
 	int socket_file_descriptor = socket_create();
 	struct sockaddr_in server_address;
 
 	server_address.sin_family = AF_INET;
-	server_address.sin_port = htons(PORT);
-	server_address.sin_addr.s_addr = inet_addr(HOST);
+	server_address.sin_port = htons(port);
+	server_address.sin_addr.s_addr = inet_addr(host_address);
 
 	if (connect(socket_file_descriptor, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
 		int err = close(socket_file_descriptor);
