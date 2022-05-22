@@ -24,7 +24,7 @@ dopodiché verrà inviato al server il numero di caratteri della stringa, <code>
 void send_to(int socket_file_descriptor, void *data, size_t data_size) {
 	int writen_return_value = writen(socket_file_descriptor, data, data_size);
 	if (writen_return_value != data_size) {
-		xtermina("write error", INFO);
+		xtermina("writen error", INFO);
 	}
 }
 ```
@@ -32,6 +32,19 @@ che prende come argomento il file descriptor del socket, un puntatore al dato da
 
 Subito dopo aver inviato la dimensione della stringa viene inviata la stringa contenente il risultato, <code>result_str</code>.
 Il nome del file viene inviato con lo stesso meccanismo.
+
+### Ricezione dei dati del client [...]
+
+
+### Gestione del segnale SIGINT
+
+La gestione del segnale SIGINT è stato assegnata alla funzione <code>handler</code> che si limita a cambiare la variabile booleana globale <code>_interrupt</code> che viene controllata all'interno della guardia del ciclo for in cui vengono inviati i nomi dei file ai thread worker
+
+```C
+for (int i = optind; i < argc && !_interrupt; i++)
+```
+
+Al momento in cui la variabile <code>_interrupt</code> viene settata a _true_ il ciclo si interrompe fermando l'invio dei nomi dei file, dopodiché manda i segnali di terminazioni a tutti i thread e aspetta la loro terminazione.
 
 
 
