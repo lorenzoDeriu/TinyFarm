@@ -51,8 +51,6 @@ def main(host=DEFAULT_HOST, port=DEFAULT_PORT):
 		except KeyboardInterrupt: pass
 		
 		server.shutdown(socket.SHUT_RDWR)
-	print("Server chiuso corretamente")
-
 
 
 def connection_handling(connection, instruction):
@@ -70,7 +68,7 @@ def connection_handling(connection, instruction):
 		file_name = data[:length_file_name]
 
 		if file_name.decode() == END_OF_TASK: 
-			instruction.shutdown() # TODO trovare soluzione migliore
+			instruction.shutdown()
 			return
 
 		print("%12s \t %s" % (result.decode(), file_name.decode()))
@@ -98,4 +96,3 @@ elif len(sys.argv) == 3:
 	main(sys.argv[1], int(sys.argv[2]))
 else:
 	print(f"usage {sys.argv[0]} [host] [port]")
-

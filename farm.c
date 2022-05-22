@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
 	char opt;
 
 	struct sigaction sa;
+	sigaction(SIGINT, NULL, &sa); 
 	sa.sa_handler = handler;
 	sigaction(SIGINT, &sa, NULL); 
 
@@ -66,8 +67,6 @@ int main(int argc, char **argv) {
 				break;
 		}
 	}
-
-	// fprintf(stderr, "host %s\nport %d", host_address, port);
 
 	if (argc - optind < 1) {
 		fprintf(stderr, "Usage: %s file [file ...] [-n num_thread] [-q buffer_length] [-t milliseconds_delay] [-h new_host_address] [-p new_port]\n", argv[0]);
@@ -170,6 +169,12 @@ void *thread_worker_body(void *arguments) {
 		fclose(file_desriptor);
  
 		int socket_file_descriptor = socket_create();
+		if (socket_file_descriptor == -1) {
+			fprintf(stderr, "Il file descriptor del socket non è stato creato correttamente\n");
+			free(file_name);
+			continue;
+		}
+
 		struct sockaddr_in server_address;
 
 		server_address.sin_family = AF_INET;
@@ -200,8 +205,7 @@ void *thread_worker_body(void *arguments) {
 	
 		free(file_name);
 		
-		int err = close(socket_file_descriptor);
-		if (err < 0) xtermina("close error", INFO);
+		close(socket_file_descriptor);
 	}
 
 	pthread_exit(NULL);
@@ -210,9 +214,7 @@ void *thread_worker_body(void *arguments) {
 int socket_create() {
 	int file_descriptor = 0;
 
-	if ((file_descriptor = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		xtermina("socket creation error", INFO);
-	}
+	if ((file_descriptor = socket(AF_INET, SOCK_STREAM, 0)) < 0) return -1;
 
 	return file_descriptor;
 }
@@ -220,7 +222,7 @@ int socket_create() {
 void send_to(int socket_file_descriptor, void *data, size_t data_size) {
 	int writen_return_value = writen(socket_file_descriptor, data, data_size);
 	if (writen_return_value != data_size) {
-		xtermina("write error", INFO);
+		xtermina("writen error", INFO);
 	}
 }
 
@@ -232,10 +234,8 @@ void close_server(int port, char *host_address) {
 	server_address.sin_port = htons(port);
 	server_address.sin_addr.s_addr = inet_addr(host_address);
 
-	if (connect(socket_file_descriptor, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-		int err = close(socket_file_descriptor);
-		if (err < 0) xtermina("close error", INFO);
-
+	if (connect(socket_file_descriptor, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
+		close(socket_file_descriptor);
 		fprintf(stderr, "Socket connection failed\n");
 		return;
 	}
@@ -251,8 +251,7 @@ void close_server(int port, char *host_address) {
 	send_to(socket_file_descriptor, (void *)&length, sizeof(length));
 	send_to(socket_file_descriptor, (void *)END_OF_TASK, strlen(END_OF_TASK));
 
-	int err = close(socket_file_descriptor);
-	if (err) xtermina("close error", INFO);
+	close(socket_file_descriptor);
 }
 
 void handler(int signal) {
