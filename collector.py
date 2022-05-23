@@ -46,7 +46,7 @@ def main(host=DEFAULT_HOST, port=DEFAULT_PORT):
 							connection_handling(c, instruction)
 		except OSError: 
 			print("Il server non è stato avviato. Riprovare avvio con porta e indirizzo differenti")
-			print("-> python3 collector.py address port")
+			print("~$ python3 collector.py address port")
 			return
 		except KeyboardInterrupt: pass
 		

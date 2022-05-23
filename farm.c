@@ -57,7 +57,9 @@ int main(int argc, char **argv) {
 				if (buffer_size < 1) termina("The size of the buffer must be higher than 1");
 				break;
 			case 't':
-				delay = atoi(optarg);
+				if (atoi(optarg) < 0) {
+					fprintf(stderr, "il tempo di delay non può essere negativo, verrà usato il valore di default\n");
+				} else delay = atoi(optarg);
 				break;
 			case 'p':
 				port = atoi(optarg);
