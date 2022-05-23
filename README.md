@@ -33,8 +33,10 @@ che prende come argomento il file descriptor del socket, un puntatore al dato da
 Subito dopo aver inviato la dimensione della stringa viene inviata la stringa contenente il risultato, <code>result_str</code>.
 Il nome del file viene inviato con lo stesso meccanismo.
 
-### Ricezione dei dati del client [...]
+### Ricezione dei dati del client
 
+Il server gestisce la ricezione dei dati da parte dei client tramite l'utilizzo della funzione <code>select()</code> che permette di gestire anche più richieste di connessione alla volta.
+Nel caso di connessioni multiple alcuni client potrebbero dover rimanere in attesa, tuttavia, poiché il tempo di gestione della connessione è molto rapido, l'eventuale tempo di attesa dei client è trascurabile.
 
 ### Gestione del segnale SIGINT
 
