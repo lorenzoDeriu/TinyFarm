@@ -24,11 +24,11 @@ typedef struct {
 	char *host_address;
 } Thread_worker_args;
 
-char **remove_option(int*, char**);
+char **remove_option(int *, char **);
 bool is_option(char *);
-void *thread_worker_body(void*);
+void *thread_worker_body(void *);
 int socket_create();
-void send_to(int, void*, size_t);
+void send_to(int, void *, size_t);
 void close_server();
 
 void handler(int);
@@ -49,12 +49,14 @@ int main(int argc, char **argv) {
 	while ((opt = getopt(argc, argv, "n:t:q:p:h:")) != -1) {
 		switch (opt) {
 			case 'n':
-				num_thread = atoi(optarg);
-				if (num_thread < 1) termina("The number of thread must be higher than 1");
+				if (num_thread < 1) {
+					fprintf(stderr, "Il numero di thread deve essere maggiore di 1, verrà usato il numero di thread di default\n");
+				} else num_thread = atoi(optarg);
 				break;
 			case 'q':
-				buffer_size = atoi(optarg);
-				if (buffer_size < 1) termina("The size of the buffer must be higher than 1");
+				if (buffer_size < 1) {
+					fprintf(stderr, "The size of the buffer must be higher than 1");
+				} else buffer_size = atoi(optarg);
 				break;
 			case 't':
 				if (atoi(optarg) < 0) {
@@ -88,7 +90,6 @@ int main(int argc, char **argv) {
 	Thread_worker_args arg[num_thread];
 	pthread_t thread_worker[num_thread];
 
-	
 	for (int i = 0;  i < num_thread; i++) {
 		arg[i].buffer = buffer;
 		arg[i].buffer_size = buffer_size;
@@ -123,7 +124,6 @@ int main(int argc, char **argv) {
 
 	for (int i = 0; i < num_thread; i++) xpthread_join(thread_worker[i], NULL, INFO);
 	
-
 	free(buffer);
 
 	close_server(port, host_address);
@@ -185,8 +185,8 @@ void *thread_worker_body(void *arguments) {
 
 		if (connect(socket_file_descriptor, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
 			close(socket_file_descriptor);
+			fprintf(stderr, "L'invio dei risultati del file %s è fallito.\n", file_name);
 			free(file_name);
-			fprintf(stderr, "Socket connection failed\n");
 			continue;
 		}
 
@@ -238,7 +238,7 @@ void close_server(int port, char *host_address) {
 
 	if (connect(socket_file_descriptor, (struct sockaddr *)&server_address, sizeof(server_address)) < 0) {
 		close(socket_file_descriptor);
-		fprintf(stderr, "Socket connection failed\n");
+		fprintf(stderr, "Il server non risulta aperto.\n");
 		return;
 	}
 
