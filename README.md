@@ -11,7 +11,7 @@ I dati da inviare al server sono:
 
 Per inviare il risultato tramite socket dobbiamo convertire il risultato in formato network, tramite l'utilizzo della funzione <code>htonl</code>.
 
-La funzione <code>htonl</code> presenta però alcune limitazioni, infatti l'argomento che viene preso deve essere nel formato <code>uint32_t</code>, ovvero un intero senza segno da massimo 32 bit.
+La funzione <code>htonl</code> presenta però alcune limitazioni, infatti l'argomento che viene preso deve essere nel formato <code>uint32_t</code>, ovvero un intero senza segno da 32 bit.
 
 Il risultato della somma degli elementi di un file però, potrebbe essere negativo o potrebbe non essere rappresentabile in 32 bit, quindi, al momento dell'invio al server verrà prima trasformato in stringa con l'utilizzo di <code>sprintf()</code>
 
@@ -47,6 +47,3 @@ for (int i = optind; i < argc && !_interrupt; i++)
 ```
 
 Al momento in cui la variabile <code>_interrupt</code> viene settata a _true_ il ciclo si interrompe fermando l'invio dei nomi dei file, dopodiché manda i segnali di terminazioni a tutti i thread e aspetta la loro terminazione.
-
-
-
