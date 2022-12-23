@@ -33,20 +33,21 @@ which takes as arguments:
 - a pointer to the data to be sent, which is converted into a void pointer to ensure the genericity of the function;
 - the number of bytes to be sent.
 
-Subito dopo aver inviato il numero di caratteri, viene inviata la stringa contenente il risultato, <code>result_str</code>.
-Con lo stesso meccanismo, viene inviato il nome del file.
+Immediately after sending the number of characters, the string containing the result, <code>result_str</code>, is sent.
+In the same way, the name of the file is sent.
 
-### Ricezione dei dati del client
+### Receiving client data
 
-Il server gestisce la ricezione dei dati da parte dei client tramite l'utilizzo della funzione <code>select()</code>, che permette di gestire anche più richieste di connessione alla volta.
-Nel caso di connessioni multiple, alcuni client potrebbero necessariamente dover attendere, tuttavia poiché il tempo di gestione della connessione è molto rapido, l'eventuale tempo di attesa dei client è trascurabile.
+The server manages the reception of data from clients using the <code>select()</code> function, which also allows multiple connection requests to be handled at the same time.
+In the case of multiple connections, some clients may necessarily have to wait, however, since the connection management time is very short, the waiting time of clients is negligible.
 
-### Gestione del segnale SIGINT
+### Handling the SIGINT signal
 
-La gestione del segnale SIGINT è stata assegnata alla funzione <code>handler</code>, la quale si limita a cambiare la variabile booleana globale <code>_interrupt</code>, che viene controllata all'interno della guardia del ciclo for, in cui vengono inviati i nomi dei file ai thread worker.
+The handling of the SIGINT signal was assigned to the <code>handler</code> function, which simply changes the global boolean variable <code>_interrupt</code>, which is checked within the guard of the for loop, in which the names of the files are sent to the worker threads.
+
 
 ```C
 for (int i = optind; i < argc && !_interrupt; i++)
 ```
 
-Nel momento in cui la variabile <code>_interrupt</code> viene settata a _true_, il ciclo si interrompe, arrestando l'invio dei nomi dei file; successivamente manda i segnali di terminazione a tutti i thread e aspetta che la loro esecuzione sia conclusa. Infine, dopo aver deallocato la memoria dedicata al buffer, invia il segnale di terminazione al server.
+When the <code>_interrupt</code> variable is set to true, the loop is interrupted, stopping the sending of the file names; then it sends the SIGINT signals to the worker threads, which will also stop their activity.
