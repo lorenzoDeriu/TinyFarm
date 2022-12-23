@@ -1,25 +1,25 @@
 # Tiny Farm
-Progetto finale Laboratorio II 2021-2022
+Final project Laboratory II 2021-2022
 
-## Scelte Progettuali:
+## Design choices:
 
-### Invio dei dati al server
+### Sending data to the server
 
-I dati da inviare al server sono:
-- il nome del file;
-- la somma dei numeri all’interno del file.
+The data to be sent to the server are:
+- the file name;
+- the sum of the numbers inside the file.
 
-Per inviare il risultato tramite socket, dobbiamo convertire il risultato in formato network, tramite l'utilizzo della funzione <code>htonl</code>.
+To send the result through the socket, we must convert the result to network format, using the <code>htonl</code> function.
 
-La funzione <code>htonl</code> presenta tuttavia alcune limitazioni, infatti l'argomento che viene preso deve essere nel formato <code>uint32_t</code>, quindi un intero senza segno da 32 bit.
+However, the <code>htonl</code> function has some limitations, as the argument taken must be in the <code>uint32_t</code> format, that is a 32-bit unsigned integer.
 
-Il risultato della somma degli elementi di un file potrebbe tuttavia essere negativo, o potrebbe non essere rappresentabile in 32 bit, quindi al momento dell'invio al server è necessario prima trasformarlo in stringa, mediante l'utilizzo della funzione <code>sprintf()</code>.
+The result of the sum of the elements of a file may be negative, or may not be representable in 32 bits, so when sending to the server it is necessary to first transform it into a string, using the <code>sprintf()</code> function.
 
 ```C
 if ((result_length = sprintf(result_str, "%ld", result)) < 0) xtermina("sprintf error", INFO);
 ```
 
-Successivamente viene inviata al server l'informazione relativa al numero di caratteri della stringa, <code>result_lenght</code>, attraverso la funzione <code>send_to()</code>;
+Then the information about the number of characters in the string, <code>result_lenght</code>, is sent to the server through the <code>send_to()</code> function;
 ```C
 void send_to(int socket_file_descriptor, void *data, size_t data_size) {
 	int writen_return_value = writen(socket_file_descriptor, data, data_size);
@@ -28,10 +28,10 @@ void send_to(int socket_file_descriptor, void *data, size_t data_size) {
 	}
 }
 ```
-la quale prende come argomenti:
-- il file descriptor del socket; 
-- un puntatore al dato da inviare, che viene convertito in un puntatore a void per garantire la genericità della funzione;
-- il numero di byte da inviare.
+which takes as arguments:
+- the socket file descriptor;
+- a pointer to the data to be sent, which is converted into a void pointer to ensure the genericity of the function;
+- the number of bytes to be sent.
 
 Subito dopo aver inviato il numero di caratteri, viene inviata la stringa contenente il risultato, <code>result_str</code>.
 Con lo stesso meccanismo, viene inviato il nome del file.
